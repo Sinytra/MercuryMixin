@@ -9,6 +9,9 @@ package org.cadixdev.mercury.mixin;
 import static org.cadixdev.mercury.mixin.annotation.AccessorType.FIELD_GETTER;
 import static org.cadixdev.mercury.mixin.util.MixinConstants.ACCESSOR_CLASS;
 import static org.cadixdev.mercury.mixin.util.MixinConstants.INJECT_CLASS;
+import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_ARG_CLASS;
+import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_EXPRESSION_VALUE;
+import static org.cadixdev.mercury.mixin.util.MixinConstants.WRAP_OPERATION_VALUE;
 import static org.cadixdev.mercury.mixin.util.MixinConstants.INVOKER_CLASS;
 import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_CONSTANT_CLASS;
 import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_VARIABLE_CLASS;
@@ -24,9 +27,7 @@ import org.cadixdev.bombe.type.Type;
 import org.cadixdev.bombe.type.signature.FieldSignature;
 import org.cadixdev.bombe.type.signature.MethodSignature;
 import org.cadixdev.lorenz.MappingSet;
-import org.cadixdev.lorenz.model.ClassMapping;
-import org.cadixdev.lorenz.model.FieldMapping;
-import org.cadixdev.lorenz.model.MethodMapping;
+import org.cadixdev.lorenz.model.*;
 import org.cadixdev.mercury.RewriteContext;
 import org.cadixdev.mercury.analysis.MercuryInheritanceProvider;
 import org.cadixdev.mercury.mixin.annotation.AccessorData;
@@ -62,6 +63,7 @@ import org.eclipse.jdt.core.dom.TypeDeclaration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class MixinRemapperVisitor extends ASTVisitor {
 
@@ -310,7 +312,10 @@ public class MixinRemapperVisitor extends ASTVisitor {
             if (Objects.equals(INJECT_CLASS, annotationType)
                     || Objects.equals(REDIRECT_CLASS, annotationType)
                     || Objects.equals(MODIFY_CONSTANT_CLASS, annotationType)
-                    || Objects.equals(MODIFY_VARIABLE_CLASS, annotationType)) {
+                    || Objects.equals(MODIFY_VARIABLE_CLASS, annotationType)
+                    || Objects.equals(MODIFY_ARG_CLASS, annotationType)
+                    || Objects.equals(WRAP_OPERATION_VALUE, annotationType)
+                    || Objects.equals(MODIFY_EXPRESSION_VALUE, annotationType)) {
                 final InjectData inject = InjectData.from(annotation);
 
                 // Find target method(s?)
@@ -435,7 +440,7 @@ public class MixinRemapperVisitor extends ASTVisitor {
                                 .orElse(true)) {
                     final MethodSignature deobfuscatedSignature = mapping.getDeobfuscatedSignature();
 
-                    return injectTarget.getMethodDescriptor().isPresent() ?
+                    return shouldIncludeDescriptor(target, mapping, injectTarget.getMethodDescriptor()) ?
                             deobfuscatedSignature.getName() + deobfuscatedSignature.getDescriptor().toString() :
                             deobfuscatedSignature.getName();
                 }
@@ -457,6 +462,12 @@ public class MixinRemapperVisitor extends ASTVisitor {
         }
 
         return remappedFull.toString();
+    }
+
+    private boolean shouldIncludeDescriptor(ClassMapping<?, ?> target, MethodMapping mapping, Optional<MethodDescriptor> descriptor) {
+        return descriptor.isPresent()
+            || target.getMethodMappings().stream().map(Mapping::getDeobfuscatedName).filter(mapping.getDeobfuscatedName()::equals).count() > 1 
+            && target.getMethodMappings().stream().map(Mapping::getObfuscatedName).filter(mapping.getObfuscatedName()::equals).count() == 1;
     }
 
     private void remapSliceAnnotation(final AST ast, final ITypeBinding declaringClass, final NormalAnnotation atAnnotation,
@@ -505,6 +516,9 @@ public class MixinRemapperVisitor extends ASTVisitor {
                         // it's just the class name
                         replaceExpression(ast, this.context, originalTarget, deobfTargetClass);
                     }
+                } else if (atDatum.getTarget().isPresent()) {
+                    atDatum.getTarget().get().getMethodDescriptor()
+                        .ifPresent(desc -> replaceExpression(ast, this.context, atRawPair.getValue(), this.mappings.deobfuscate(desc).toString()));
                 }
             }
         }

@@ -11,6 +11,7 @@ public final class MixinConstants {
     public static final String MIXIN_PACKAGE = "org.spongepowered.asm.mixin";
     public static final String GEN_PACKAGE = MIXIN_PACKAGE + ".gen";
     public static final String INJECTION_PACKAGE = MIXIN_PACKAGE + ".injection";
+    public static final String EXTRAS_INJECTION_PACKAGE = "com.llamalad7.mixinextras.injector";
 
     public static final String MIXIN_CLASS = MIXIN_PACKAGE + ".Mixin";
     public static final String SHADOW_CLASS = MIXIN_PACKAGE + ".Shadow";
@@ -30,6 +31,10 @@ public final class MixinConstants {
     public static final String CONSTANT_CLASS = INJECTION_PACKAGE + ".Constant";
     public static final String MODIFY_CONSTANT_CLASS = INJECTION_PACKAGE + ".ModifyConstant";
     public static final String MODIFY_VARIABLE_CLASS = INJECTION_PACKAGE + ".ModifyVariable";
+    public static final String MODIFY_ARG_CLASS = INJECTION_PACKAGE + ".ModifyArg";
+    // extras
+    public static final String MODIFY_EXPRESSION_VALUE = EXTRAS_INJECTION_PACKAGE + ".ModifyExpressionValue";
+    public static final String WRAP_OPERATION_VALUE = EXTRAS_INJECTION_PACKAGE + ".wrapoperation.WrapOperation";
 
     private MixinConstants() {
     }

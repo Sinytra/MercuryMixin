@@ -11,6 +11,8 @@ import org.eclipse.jdt.core.dom.IMemberValuePairBinding;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A container for data held in the {@code @At} annotation.
@@ -19,6 +21,8 @@ import java.util.Optional;
  * @since 0.1.0
  */
 public class AtData {
+    private static final Pattern DOT_REF_PATTERN = Pattern.compile("([\\w_$/]+)\\.(.*\\(.*?\\).+)");
+    private static final Pattern METHOD_REF_PATTERN = Pattern.compile("^(\\(.*?\\).+)$");
 
     // @At(value = "", target = "")
     public static AtData from(final IAnnotationBinding binding) {
@@ -33,14 +37,27 @@ public class AtData {
             else if (Objects.equals("target", pair.getName())) {
                 final String combined = (String) pair.getValue();
 
+                Matcher methodDescMatcher = METHOD_REF_PATTERN.matcher(combined);
+                if (methodDescMatcher.matches()) {
+                    className = null;
+                    target = InjectTarget.of(combined);
+                    break;
+                }
+
                 final int semiIndex = combined.indexOf(';');
                 if (semiIndex >= 0) {
                     className = combined.substring(1, semiIndex);
                     target = InjectTarget.of(combined.substring(semiIndex + 1));
                 }
                 else {
-                    // it's just the class name, probably a NEW
-                    className = combined;
+                    Matcher matcher = DOT_REF_PATTERN.matcher(combined);
+                    if (matcher.matches()) {
+                        className = matcher.group(1);
+                        target = InjectTarget.of(matcher.group(2));
+                    } else {
+                        // it's just the class name, probably a NEW
+                        className = combined;   
+                    }
                 }
             }
         }

@@ -3,22 +3,26 @@ plugins {
     id 'maven-publish'
 
     id 'net.minecrell.licenser' version '0.4.1'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 
     withJavadocJar()
     withSourcesJar()
 }
 
-group = 'org.cadixdev'
+group = 'org.sinytra'
 archivesBaseName = project.name.toLowerCase()
-version = '0.1.0-SNAPSHOT'
+version = '0.2.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+    maven {
+        url = 'https://maven.fabricmc.net'
+    }
     if (mercuryVersion.endsWith("-SNAPSHOT")) {
         maven {
             url 'https://oss.sonatype.org/content/groups/public/'
@@ -30,6 +34,11 @@ dependencies {
     api "org.cadixdev:mercury:$mercuryVersion"
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
+}
+
+shadowJar {
+    configurations = []
+    relocate 'org.eclipse', 'org.cadixdev.mercury.shadow.org.eclipse'
 }
 
 test {
@@ -91,15 +100,11 @@ publishing {
         }
     }
     repositories {
-        if (project.hasProperty('ossrhUsername') && project.hasProperty('ossrhPassword')) {
+        if (System.getenv("MAVEN_URL") != null) {
             maven {
-                url = !version.endsWith('-SNAPSHOT') ?
-                        'https://oss.sonatype.org/service/local/staging/deploy/maven2/' :
-                        'https://oss.sonatype.org/content/repositories/snapshots/'
-
                 credentials {
-                    username = ossrhUsername
-                    password = ossrhPassword
+                    username System.getenv("MAVEN_USERNAME")
+                    password System.getenv("MAVEN_PASSWORD")
                 }
             }
         }
