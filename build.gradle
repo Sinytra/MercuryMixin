@@ -102,6 +102,7 @@ publishing {
     repositories {
         if (System.getenv("MAVEN_URL") != null) {
             maven {
+                url System.getenv("MAVEN_URL")
                 credentials {
                     username System.getenv("MAVEN_USERNAME")
                     password System.getenv("MAVEN_PASSWORD")
