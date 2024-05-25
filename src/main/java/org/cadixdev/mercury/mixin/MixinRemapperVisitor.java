@@ -7,17 +7,7 @@
 package org.cadixdev.mercury.mixin;
 
 import static org.cadixdev.mercury.mixin.annotation.AccessorType.FIELD_GETTER;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.ACCESSOR_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.INJECT_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_ARG_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_EXPRESSION_VALUE;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.WRAP_OPERATION_VALUE;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.INVOKER_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_CONSTANT_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.MODIFY_VARIABLE_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.OVERWRITE_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.REDIRECT_CLASS;
-import static org.cadixdev.mercury.mixin.util.MixinConstants.SHADOW_CLASS;
+import static org.cadixdev.mercury.mixin.util.MixinConstants.*;
 import static org.cadixdev.mercury.util.BombeBindings.convertType;
 
 import org.cadixdev.bombe.analysis.InheritanceProvider;
@@ -39,6 +29,7 @@ import org.cadixdev.mercury.mixin.annotation.InjectTarget;
 import org.cadixdev.mercury.mixin.annotation.MixinClass;
 import org.cadixdev.mercury.mixin.annotation.ShadowData;
 import org.cadixdev.mercury.mixin.annotation.SliceData;
+import org.cadixdev.mercury.mixin.util.MixinConstants;
 import org.cadixdev.mercury.util.BombeBindings;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTVisitor;
@@ -64,6 +55,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class MixinRemapperVisitor extends ASTVisitor {
 
@@ -323,7 +315,7 @@ public class MixinRemapperVisitor extends ASTVisitor {
                 final String[] injectTargets = new String[inject.getInjectTargets().length];
                 for (int j = 0; j < inject.getInjectTargets().length; j++) {
                     final InjectTarget injectTarget = inject.getInjectTargets()[j];
-                    injectTargets[j] = remapInjectTarget(target, injectTarget);
+                    injectTargets[j] = remapInjectTarget(target, injectTarget, binding);
                 }
 
                 final NormalAnnotation originalAnnotation = (NormalAnnotation) node.modifiers().get(i);
@@ -403,7 +395,7 @@ public class MixinRemapperVisitor extends ASTVisitor {
         return true;
     }
 
-    private String remapInjectTarget(final ClassMapping<?, ?> target, final InjectTarget injectTarget) {
+    private String remapInjectTarget(final ClassMapping<?, ?> target, final InjectTarget injectTarget, final IMethodBinding binding) {
         final String targetName = injectTarget.getTargetName();
 
         if (injectTarget.getFieldType().isPresent()) {
@@ -432,12 +424,22 @@ public class MixinRemapperVisitor extends ASTVisitor {
             }
         }
         else {
+            // Handle cases where there are multiple matching obfuscated methods and only one valid deobfuscated target
+            MethodDescriptor methodDescriptor = injectTarget.getMethodDescriptor().orElse(null);
+            if (methodDescriptor == null && binding != null && shouldCalculateDescriptor(target, targetName)) {
+                List<ITypeBinding> parameters = List.of(binding.getParameterTypes());
+                int ciIndex = parameters.stream().filter(t -> CALLBACK_TYPES.contains(t.getBinaryName())).findFirst().map(parameters::indexOf).orElse(-1);
+                if (ciIndex != -1) {
+                    ITypeBinding reuturnType = parameters.get(ciIndex);
+                    String methodParams = parameters.subList(0, ciIndex).stream().map(MixinRemapperVisitor::getTypeDescriptor).collect(Collectors.joining(""));
+                    String returnTypeDesc = reuturnType.getBinaryName().equals(CALLBACK_INFO) ? "V" : getTypeDescriptor(reuturnType.getTypeParameters()[0]);
+                    methodDescriptor = MethodDescriptor.of("(" + methodParams + ")" + returnTypeDesc);
+                }
+            }
+
             // this is probably targeting a method
             for (final MethodMapping mapping : target.getMethodMappings()) {
-                if (Objects.equals(targetName, mapping.getObfuscatedName()) &&
-                        injectTarget.getMethodDescriptor()
-                                .map(d -> d.equals(mapping.getDescriptor()))
-                                .orElse(true)) {
+                if (Objects.equals(targetName, mapping.getObfuscatedName()) && (methodDescriptor == null || methodDescriptor.equals(mapping.getDescriptor()))) {
                     final MethodSignature deobfuscatedSignature = mapping.getDeobfuscatedSignature();
 
                     return shouldIncludeDescriptor(target, mapping, injectTarget.getMethodDescriptor()) ?
@@ -468,6 +470,10 @@ public class MixinRemapperVisitor extends ASTVisitor {
         return descriptor.isPresent()
             || target.getMethodMappings().stream().map(Mapping::getDeobfuscatedName).filter(mapping.getDeobfuscatedName()::equals).count() > 1 
             && target.getMethodMappings().stream().map(Mapping::getObfuscatedName).filter(mapping.getObfuscatedName()::equals).count() == 1;
+    }
+
+    private boolean shouldCalculateDescriptor(ClassMapping<?, ?> target, String targetName) {
+        return target.getMethodMappings().stream().filter(m -> Objects.equals(targetName, m.getObfuscatedName())).count() > 1;
     }
 
     private void remapSliceAnnotation(final AST ast, final ITypeBinding declaringClass, final NormalAnnotation atAnnotation,
@@ -508,7 +514,7 @@ public class MixinRemapperVisitor extends ASTVisitor {
 
                     if (atDatum.getTarget().isPresent()) {
                         final InjectTarget atTarget = atDatum.getTarget().get();
-                        final String newTarget = remapInjectTarget(atTargetMappings, atTarget);
+                        final String newTarget = remapInjectTarget(atTargetMappings, atTarget, null);
                         String deobfTarget = "L" + deobfTargetClass + ";" + newTarget;
                         replaceExpression(ast, this.context, originalTarget, deobfTarget);
                     }
@@ -592,4 +598,7 @@ public class MixinRemapperVisitor extends ASTVisitor {
         return new MethodSignature(name, new MethodDescriptor(parameters, convertType(binding.getReturnType())));
     }
 
+    private static String getTypeDescriptor(ITypeBinding binding) {
+        return binding.isPrimitive() ? binding.getBinaryName() : "L" + binding.getBinaryName().replace('.', '/') + ";";
+    }
 }

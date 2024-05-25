@@ -6,6 +6,8 @@
 
 package org.cadixdev.mercury.mixin.util;
 
+import java.util.Set;
+
 public final class MixinConstants {
 
     public static final String MIXIN_PACKAGE = "org.spongepowered.asm.mixin";
@@ -35,6 +37,10 @@ public final class MixinConstants {
     // extras
     public static final String MODIFY_EXPRESSION_VALUE = EXTRAS_INJECTION_PACKAGE + ".ModifyExpressionValue";
     public static final String WRAP_OPERATION_VALUE = EXTRAS_INJECTION_PACKAGE + ".wrapoperation.WrapOperation";
+
+    public static final String CALLBACK_INFO = INJECTION_PACKAGE + ".callback.CallbackInfo";
+    public static final String CALLBACK_INFO_RETURNABLE = INJECTION_PACKAGE + ".callback.CallbackInfoReturnable";
+    public static final Set<String> CALLBACK_TYPES = Set.of(CALLBACK_INFO, CALLBACK_INFO_RETURNABLE);
 
     private MixinConstants() {
     }
