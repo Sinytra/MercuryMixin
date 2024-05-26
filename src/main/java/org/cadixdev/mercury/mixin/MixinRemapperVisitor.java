@@ -426,20 +426,30 @@ public class MixinRemapperVisitor extends ASTVisitor {
         else {
             // Handle cases where there are multiple matching obfuscated methods and only one valid deobfuscated target
             MethodDescriptor methodDescriptor = injectTarget.getMethodDescriptor().orElse(null);
-            if (methodDescriptor == null && binding != null && shouldCalculateDescriptor(target, targetName)) {
-                List<ITypeBinding> parameters = List.of(binding.getParameterTypes());
-                int ciIndex = parameters.stream().filter(t -> CALLBACK_TYPES.contains(t.getBinaryName())).findFirst().map(parameters::indexOf).orElse(-1);
+            boolean needsDescriptor = shouldCalculateDescriptor(target, targetName);
+            List<ITypeBinding> targetMethodParams = null;
+            if (methodDescriptor == null && binding != null && needsDescriptor) {
+                List<ITypeBinding> bindingParams = List.of(binding.getParameterTypes());
+                int ciIndex = bindingParams.stream().filter(t -> CALLBACK_TYPES.contains(t.getBinaryName())).findFirst().map(bindingParams::indexOf).orElse(-1);
                 if (ciIndex != -1) {
-                    ITypeBinding reuturnType = parameters.get(ciIndex);
-                    String methodParams = parameters.subList(0, ciIndex).stream().map(MixinRemapperVisitor::getTypeDescriptor).collect(Collectors.joining(""));
-                    String returnTypeDesc = reuturnType.getBinaryName().equals(CALLBACK_INFO) ? "V" : getTypeDescriptor(reuturnType.getTypeParameters()[0]);
-                    methodDescriptor = MethodDescriptor.of("(" + methodParams + ")" + returnTypeDesc);
+                    ITypeBinding returnType = bindingParams.get(ciIndex);
+                    String methodParams = bindingParams.subList(0, ciIndex).stream().map(MixinRemapperVisitor::getTypeDescriptor).collect(Collectors.joining(""));
+                    boolean isVoid = returnType.getBinaryName().equals(CALLBACK_INFO);
+                    // Do we know the return type?
+                    if (isVoid || returnType.getTypeParameters().length > 0) {
+                        String returnTypeDesc = isVoid ? "V" : getTypeDescriptor(returnType.getTypeParameters()[0]);
+                        methodDescriptor = MethodDescriptor.of("(" + methodParams + ")" + returnTypeDesc);   
+                    }
+                    // Try to match based on method params
+                    else {
+                        targetMethodParams = bindingParams.subList(0, bindingParams.size() - 1);
+                    }
                 }
             }
 
             // this is probably targeting a method
             for (final MethodMapping mapping : target.getMethodMappings()) {
-                if (Objects.equals(targetName, mapping.getObfuscatedName()) && (methodDescriptor == null || methodDescriptor.equals(mapping.getDescriptor()))) {
+                if (Objects.equals(targetName, mapping.getObfuscatedName()) && matchDescriptor(methodDescriptor, needsDescriptor, mapping, targetMethodParams)) {
                     final MethodSignature deobfuscatedSignature = mapping.getDeobfuscatedSignature();
 
                     return shouldIncludeDescriptor(target, mapping, injectTarget.getMethodDescriptor()) ?
@@ -466,6 +476,25 @@ public class MixinRemapperVisitor extends ASTVisitor {
         return remappedFull.toString();
     }
 
+    private boolean matchDescriptor(MethodDescriptor methodDescriptor, boolean needsDescriptor, MethodMapping mapping, List<ITypeBinding> targetMethodParams) {
+        return methodDescriptor == null && (!needsDescriptor || matchParameters(mapping, targetMethodParams)) || methodDescriptor != null && methodDescriptor.equals(mapping.getDescriptor());
+    }
+
+    private boolean matchParameters(MethodMapping mapping, List<ITypeBinding> mixinParams) {
+        if (mixinParams != null) {
+            List<FieldType> targetParams = MethodDescriptor.of(mapping.getObfuscatedDescriptor()).getParamTypes();
+            if (targetParams.size() == mixinParams.size()) {
+                for (int i = 0; i < targetParams.size(); i++) {
+                    if (!targetParams.get(i).toString().equals(getTypeDescriptor(mixinParams.get(i)))) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean shouldIncludeDescriptor(ClassMapping<?, ?> target, MethodMapping mapping, Optional<MethodDescriptor> descriptor) {
         return descriptor.isPresent()
             || target.getMethodMappings().stream().map(Mapping::getDeobfuscatedName).filter(mapping.getDeobfuscatedName()::equals).count() > 1 
@@ -473,7 +502,9 @@ public class MixinRemapperVisitor extends ASTVisitor {
     }
 
     private boolean shouldCalculateDescriptor(ClassMapping<?, ?> target, String targetName) {
-        return target.getMethodMappings().stream().filter(m -> Objects.equals(targetName, m.getObfuscatedName())).count() > 1;
+        // Calculate descriptor when there's multiple candidates with varying deobf names
+        List<MethodMapping> candidates = target.getMethodMappings().stream().filter(m -> Objects.equals(targetName, m.getObfuscatedName())).toList();
+        return candidates.size() > 1 && candidates.stream().anyMatch(m -> !Objects.equals(candidates.get(0).getDeobfuscatedName(), m.getDeobfuscatedName()));
     }
 
     private void remapSliceAnnotation(final AST ast, final ITypeBinding declaringClass, final NormalAnnotation atAnnotation,
