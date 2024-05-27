@@ -36,6 +36,7 @@ public final class MixinConstants {
     public static final String MODIFY_ARG_CLASS = INJECTION_PACKAGE + ".ModifyArg";
     // extras
     public static final String MODIFY_EXPRESSION_VALUE = EXTRAS_INJECTION_PACKAGE + ".ModifyExpressionValue";
+    public static final String MODIFY_RETURN_VALUE = EXTRAS_INJECTION_PACKAGE + ".ModifyReturnValue";
     public static final String WRAP_OPERATION_VALUE = EXTRAS_INJECTION_PACKAGE + ".wrapoperation.WrapOperation";
 
     public static final String CALLBACK_INFO = INJECTION_PACKAGE + ".callback.CallbackInfo";

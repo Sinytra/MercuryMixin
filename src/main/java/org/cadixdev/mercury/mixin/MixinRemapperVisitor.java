@@ -307,7 +307,8 @@ public class MixinRemapperVisitor extends ASTVisitor {
                     || Objects.equals(MODIFY_VARIABLE_CLASS, annotationType)
                     || Objects.equals(MODIFY_ARG_CLASS, annotationType)
                     || Objects.equals(WRAP_OPERATION_VALUE, annotationType)
-                    || Objects.equals(MODIFY_EXPRESSION_VALUE, annotationType)) {
+                    || Objects.equals(MODIFY_EXPRESSION_VALUE, annotationType)
+                    || Objects.equals(MODIFY_RETURN_VALUE, annotationType)) {
                 final InjectData inject = InjectData.from(annotation);
 
                 // Find target method(s?)
