@@ -11,6 +11,8 @@ import org.cadixdev.bombe.type.Type;
 import org.cadixdev.bombe.type.TypeReader;
 
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Inject target can either be a name, a name and method signature, or a name and field type.
@@ -19,30 +21,47 @@ import java.util.Optional;
  * @since 0.1.0
  */
 public class InjectTarget {
+    public static final Pattern FULL_REF_PATTERN = Pattern.compile("([\\w_$/]+)\\.(.*)(\\(.*?\\).+)|L([\\w_$/]+);(.*)(\\(.*?\\).+)");
 
+    private final String ownerName;
     private final String targetName;
     private final MethodDescriptor methodDescriptor;
     private final Type fieldType;
 
     public InjectTarget(final String targetName) {
+        this.ownerName = null;
         this.targetName = targetName;
         this.methodDescriptor = null;
         this.fieldType = null;
     }
 
     public InjectTarget(final String targetName, final MethodDescriptor methodDescriptor) {
+        this.ownerName = null;
         this.targetName = targetName;
         this.methodDescriptor = methodDescriptor;
         this.fieldType = null;
     }
 
     public InjectTarget(final String targetName, final Type fieldType) {
+        this.ownerName = null;
         this.targetName = targetName;
         this.methodDescriptor = null;
         this.fieldType = fieldType;
     }
+    
+    public InjectTarget(final String ownerName, final String targetName, final MethodDescriptor methodDescriptor) {
+        this.ownerName = ownerName;
+        this.targetName = targetName;
+        this.methodDescriptor = methodDescriptor;
+        this.fieldType = null;
+    }
 
     public static InjectTarget of(final String target) {
+        Matcher matcher = FULL_REF_PATTERN.matcher(target);
+        if (matcher.matches()) {
+            return new InjectTarget(matcher.group(1), matcher.group(2), MethodDescriptor.of(matcher.group(3)));
+        }
+
         int index = target.indexOf('(');
         if (index >= 0) {
             return new InjectTarget(target.substring(0, index), MethodDescriptor.of(target.substring(index)));
@@ -53,6 +72,10 @@ public class InjectTarget {
             return new InjectTarget(target.substring(0, index), fieldType);
         }
         return new InjectTarget(target);
+    }
+
+    public String getOwnerName() {
+        return this.ownerName;
     }
 
     public String getTargetName() {

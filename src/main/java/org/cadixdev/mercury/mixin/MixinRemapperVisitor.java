@@ -461,10 +461,14 @@ public class MixinRemapperVisitor extends ASTVisitor {
         }
 
         final MappingSet mappings = target.getMappings();
+        final String targetOwner = injectTarget.getOwnerName();
         final MethodDescriptor descriptor = injectTarget.getMethodDescriptor().orElse(null);
         final Type type = injectTarget.getFieldType().orElse(null);
 
         final StringBuilder remappedFull = new StringBuilder();
+        if (targetOwner != null) {
+            remappedFull.append("L").append(targetOwner).append(";");
+        }
         remappedFull.append(targetName);
         if (descriptor != null) {
             remappedFull.append(mappings.deobfuscate(descriptor));
