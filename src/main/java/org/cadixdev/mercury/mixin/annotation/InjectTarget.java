@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  * @since 0.1.0
  */
 public class InjectTarget {
-    public static final Pattern FULL_REF_PATTERN = Pattern.compile("([\\w_$/]+)\\.(.*)(\\(.*?\\).+)|L([\\w_$/]+);(.*)(\\(.*?\\).+)");
+    public static final Pattern FULL_REF_PATTERN = Pattern.compile("L?([\\w_$/]+)[.;](.*)(\\(.*?\\).+)");
 
     private final String ownerName;
     private final String targetName;
