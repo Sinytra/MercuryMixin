@@ -87,7 +87,7 @@ public enum AccessorType {
     public static AccessorType get(final boolean isInvoker, final IMethodBinding binding, final MethodSignature signature, final AccessorData data) {
         // @Invoker
         if (isInvoker) {
-            if (Modifier.isStatic(binding.getModifiers())) {
+            if (Modifier.isStatic(binding.getModifiers()) && (data.getTarget().equals("<init>") || data.getTarget().contains("/") || data.getTarget().contains("."))) {
                 // Okay, this should be more indepth - but its enough for now
                 return OBJECT_FACTORY;
             }
