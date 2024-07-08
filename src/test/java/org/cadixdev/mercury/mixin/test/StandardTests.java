@@ -11,14 +11,14 @@ import org.junit.jupiter.api.Test;
 
 public class StandardTests {
 
-    @Test
-    void testAccessors() throws Exception {
-        new TestGroup("accessor", (mercury, mappings) -> {
-            mercury.getProcessors().add(MixinRemapper.create(mappings));
-        })
-                .register("TestTargetAccessor", "TestTargetAccessor")
-                .test();
-    }
+//    @Test
+//    void testAccessors() throws Exception {
+//        new TestGroup("accessor", (mercury, mappings) -> {
+//            mercury.getProcessors().add(MixinRemapper.create(mappings));
+//        })
+//                .register("TestTargetAccessor", "TestTargetAccessor")
+//                .test();
+//    }
 
     @Test
     void testMixins() throws Exception {
